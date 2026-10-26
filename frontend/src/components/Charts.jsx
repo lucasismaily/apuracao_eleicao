@@ -118,14 +118,7 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
         </div>
       </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.55fr) minmax(320px, 1.15fr)',
-          gap: '22px',
-          alignItems: 'start',
-        }}
-      >
+      <div className="pos17h-interactive-grid">
         {/* Coluna Esquerda: Card Total Consolidado + Lista de Faixas Horárias */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {/* ITEM CONSOLIDADO: TODOS OS VOTOS APÓS AS 17H */}
