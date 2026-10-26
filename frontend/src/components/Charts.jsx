@@ -102,7 +102,7 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
           </button>
         </div>
 
-        <div className="year-selector">
+        <div className="year-selector metric-selector">
           <button
             className={`year-btn ${metricMode === 'log' ? 'active' : ''}`}
             onClick={() => setMetricMode('log')}
@@ -120,7 +120,7 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
 
       <div className="pos17h-interactive-grid">
         {/* Coluna Esquerda: Card Total Consolidado + Lista de Faixas Horárias */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', minWidth: 0 }}>
           {/* ITEM CONSOLIDADO: TODOS OS VOTOS APÓS AS 17H */}
           <div
             onClick={() => setSelectedKey('TODOS')}
@@ -331,7 +331,9 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
                 <div
                   style={{
                     display: 'flex',
+                    flexWrap: 'wrap',
                     justifyContent: 'space-between',
+                    gap: '6px',
                     fontSize: '0.75rem',
                     color: '#64748b',
                   }}
@@ -363,11 +365,13 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
             background: '#ffffff',
             border: '1px solid #e2e8f0',
             borderRadius: '16px',
-            padding: '22px',
+            padding: '18px 16px',
             display: 'flex',
             flexDirection: 'column',
             gap: '16px',
             boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)',
+            minWidth: 0,
+            maxWidth: '100%',
           }}
         >
           <div style={{ textAlign: 'center' }}>
@@ -492,7 +496,7 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
                 borderRadius: '6px',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px' }}>
                 <strong style={{ fontSize: '0.8rem', color: '#b45309' }}>
                   1. Votos Efetivados na Urna Após 17h (Log)
                 </strong>
@@ -514,7 +518,7 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
                 borderRadius: '6px',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: '4px' }}>
                 <strong style={{ fontSize: '0.8rem', color: '#0f172a' }}>
                   2. Votos Totais nas Seções Encerradas &gt; 17h (BU)
                 </strong>
@@ -532,7 +536,9 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
               <div
                 style={{
                   display: 'flex',
+                  flexWrap: 'wrap',
                   justifyContent: 'space-between',
+                  gap: '4px',
                   fontSize: '0.73rem',
                   fontWeight: 700,
                   color: '#475569',
@@ -573,15 +579,17 @@ export function Post17hBarChart({ faixas, cand1, cand2 }) {
               <div
                 style={{
                   display: 'flex',
+                  flexWrap: 'wrap',
                   justifyContent: 'space-between',
+                  gap: '4px',
                   fontSize: '0.71rem',
                   color: '#64748b',
                   marginTop: '4px',
                 }}
               >
-                <span>■ 08h às 17h: {fmtInt(votosAntes17hNessasSecoes)} votos ({pctAntes17hDentroDasSecoes.replace('.', ',')}%)</span>
+                <span>■ 08h às 17h: {fmtInt(votosAntes17hNessasSecoes)} ({pctAntes17hDentroDasSecoes.replace('.', ',')}%)</span>
                 <span style={{ color: '#b45309', fontWeight: 700 }}>
-                  ■ Após 17h: {fmtInt(activeFaixa.votos_efetivados_log)} votos ({pctApos17hDentroDasSecoes.replace('.', ',')}%)
+                  ■ Após 17h: {fmtInt(activeFaixa.votos_efetivados_log)} ({pctApos17hDentroDasSecoes.replace('.', ',')}%)
                 </span>
               </div>
             </div>

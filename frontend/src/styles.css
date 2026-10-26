@@ -1035,8 +1035,20 @@ body {
   .year-selector .year-btn {
     flex: 1;
     text-align: center;
-    padding: 8px 10px;
-    font-size: 0.78rem;
+    padding: 8px 8px;
+    font-size: 0.76rem;
+    white-space: normal;
+    line-height: 1.25;
+  }
+
+  .year-selector.metric-selector {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .year-selector.metric-selector .year-btn {
+    width: 100%;
+    padding: 9px 10px;
   }
 
   .status-pill {
