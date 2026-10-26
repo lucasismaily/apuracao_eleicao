@@ -1,10 +1,92 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Post17hBarChart, EvolutionLineChart } from './components/Charts.jsx';
 
-const API_BASE = import.meta.env?.VITE_API_URL || 'http://127.0.0.1:8765';
+const isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+
+const API_BASE = import.meta.env?.VITE_API_URL || (isLocalhost ? 'http://127.0.0.1:8765' : '');
 
 const fmtInt = (n) => Number(n || 0).toLocaleString('pt-BR');
 const fmtPct = (n) => `${Number(n || 0).toFixed(2).replace('.', ',')}%`;
+
+const UF_FUSO_BRASILIA = {
+  AC: -2,
+  AM: -1,
+  RO: -1,
+  RR: -1,
+  MT: -1,
+  MS: -1,
+};
+
+function analisarLogClientFallback(logText, uf = 'SP') {
+  const ufUpper = (uf || 'SP').toUpperCase().trim();
+  const offsetHoras = UF_FUSO_BRASILIA[ufUpper] || 0;
+  const regexTs = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2}:\d{2})\s+\w+\s+(\S+)\s+(.+)/;
+
+  let votosTotais = 0;
+  let votosAte17h = 0;
+  let votosApos17h = 0;
+  const eventosApos17h = [];
+  let horarioInicio = null;
+  let horarioEncerramento = null;
+  let idUrna = '67305985';
+
+  for (const rawLine of (logText || '').split('\n')) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const match = line.match(regexTs);
+    if (!match) continue;
+    const [, dataStr, horaStr, ueId, msg] = match;
+    idUrna = ueId;
+
+    const [hh, mm, ss] = horaStr.split(':').map(Number);
+    const horaBrasiliaSeg = hh * 3600 + mm * 60 + ss - offsetHoras * 3600;
+    const hBr = Math.floor(horaBrasiliaSeg / 3600) % 24;
+    const mBr = Math.floor((horaBrasiliaSeg % 3600) / 60);
+    const sBr = horaBrasiliaSeg % 60;
+    const horaBrasiliaFmt = `${String(hBr).padStart(2, '0')}:${String(mBr).padStart(2, '0')}:${String(sBr).padStart(2, '0')}`;
+
+    const msgLower = msg.toLowerCase();
+    if (msgLower.includes('início da votação') || msgLower.includes('inicio da votacao')) {
+      horarioInicio = horaBrasiliaFmt;
+    } else if (msgLower.includes('encerrando votação') || msgLower.includes('boletim de urna emitido')) {
+      horarioEncerramento = horaBrasiliaFmt;
+    }
+
+    if (msgLower.includes('voto do eleitor foi registrado') || msgLower.includes('voto confirmado')) {
+      votosTotais += 1;
+      if (horaBrasiliaSeg > 17 * 3600) {
+        votosApos17h += 1;
+        const segAlem = horaBrasiliaSeg - 17 * 3600;
+        eventosApos17h.push({
+          sequencia_voto: votosTotais,
+          data: dataStr,
+          horario_local_urna: horaStr,
+          horario_brasilia: horaBrasiliaFmt,
+          tempo_apos_17h: `+${String(Math.floor(segAlem / 60)).padStart(2, '0')}m${String(segAlem % 60).padStart(2, '0')}s`,
+          mensagem: msg.trim(),
+        });
+      } else {
+        votosAte17h += 1;
+      }
+    }
+  }
+
+  return {
+    uf_analisada: ufUpper,
+    fuso_diferenca_brasilia_horas: offsetHoras,
+    id_urna_eletronica: idUrna,
+    horario_abertura_brasilia: horarioInicio || '08:00:00',
+    horario_encerramento_brasilia: horarioEncerramento || '17:00:00',
+    votos_totais_registrados: votosTotais,
+    votos_ate_17h00: votosAte17h,
+    votos_efetivados_apos_17h00: votosApos17h,
+    percentual_apos_17h: votosTotais ? Number(((votosApos17h / votosTotais) * 100).toFixed(2)) : 0,
+    secao_encerrou_apos_17h: votosApos17h > 0,
+    registros_apos_17h: eventosApos17h,
+  };
+}
 
 export default function App() {
   const [ano, setAno] = useState(2026);
@@ -30,15 +112,26 @@ export default function App() {
     setLoading(true);
     setErro(null);
     try {
-      const resp = await fetch(`${API_BASE}/api/resultados?ano=${anoAlvo}&live=true`);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const json = await resp.json();
+      let json = null;
+      if (API_BASE) {
+        try {
+          const resp = await fetch(`${API_BASE}/api/resultados?ano=${anoAlvo}&live=true`);
+          if (resp.ok) json = await resp.json();
+        } catch (_) {
+          // Fallback para snapshot estático exportado pelo Python no Cloudflare Pages
+        }
+      }
+      if (!json) {
+        const staticResp = await fetch(`/data/resultados-${anoAlvo}.json`);
+        if (!staticResp.ok) throw new Error(`HTTP ${staticResp.status}`);
+        json = await staticResp.json();
+      }
       setDados(json);
       if (json?.ufs?.length > 0) {
         setUfEmFoco(json.ufs[0]);
       }
     } catch (e) {
-      setErro(`Não foi possível conectar ao back-end Python em ${API_BASE}. Verifique se o servidor está rodando.`);
+      setErro(`Não foi possível carregar os dados da eleição (${e.message}).`);
     } finally {
       setLoading(false);
     }
@@ -46,11 +139,24 @@ export default function App() {
 
   const carregarExemploLog = async (ufAlvo = ufLog) => {
     try {
-      const resp = await fetch(`${API_BASE}/api/log-exemplo?uf=${ufAlvo}`);
-      if (resp.ok) {
-        const json = await resp.json();
+      if (API_BASE) {
+        try {
+          const resp = await fetch(`${API_BASE}/api/log-exemplo?uf=${ufAlvo}`);
+          if (resp.ok) {
+            const json = await resp.json();
+            setLogText(json.log_bruto || '');
+            setResultadoLog(json.analise || null);
+            return;
+          }
+        } catch (_) {
+          // fallback
+        }
+      }
+      const staticResp = await fetch(`/data/log-exemplo.json`);
+      if (staticResp.ok) {
+        const json = await staticResp.json();
         setLogText(json.log_bruto || '');
-        setResultadoLog(json.analise || null);
+        setResultadoLog(analisarLogClientFallback(json.log_bruto || '', ufAlvo));
       }
     } catch (_) {
       // ignora erro silenciosamente
@@ -59,15 +165,23 @@ export default function App() {
 
   const analisarLogCustom = async () => {
     try {
-      const resp = await fetch(`${API_BASE}/api/analisar-log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ log_text: logText, uf: ufLog }),
-      });
-      if (resp.ok) {
-        const json = await resp.json();
-        setResultadoLog(json);
+      if (API_BASE) {
+        try {
+          const resp = await fetch(`${API_BASE}/api/analisar-log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ log_text: logText, uf: ufLog }),
+          });
+          if (resp.ok) {
+            const json = await resp.json();
+            setResultadoLog(json);
+            return;
+          }
+        } catch (_) {
+          // fallback
+        }
       }
+      setResultadoLog(analisarLogClientFallback(logText, ufLog));
     } catch (_) {
       // ignora
     }
@@ -75,9 +189,21 @@ export default function App() {
 
   const carregarTseRaw = async (anoAlvo = ano, ufAlvo = ufRaw) => {
     try {
-      const resp = await fetch(`${API_BASE}/api/tse-raw?ano=${anoAlvo}&uf=${ufAlvo}`);
-      if (resp.ok) {
-        const json = await resp.json();
+      if (API_BASE) {
+        try {
+          const resp = await fetch(`${API_BASE}/api/tse-raw?ano=${anoAlvo}&uf=${ufAlvo}`);
+          if (resp.ok) {
+            const json = await resp.json();
+            setTseRaw(json);
+            return;
+          }
+        } catch (_) {
+          // fallback
+        }
+      }
+      const staticResp = await fetch(`/data/tse-raw-${anoAlvo}-${ufAlvo}.json`);
+      if (staticResp.ok) {
+        const json = await staticResp.json();
         setTseRaw(json);
       }
     } catch (_) {
@@ -142,7 +268,7 @@ export default function App() {
     return (
       <div className="app-container" style={{ paddingTop: '60px' }}>
         <div className="section-card" style={{ borderColor: '#e11d48' }}>
-          <h2 style={{ color: '#e11d48', marginBottom: '10px' }}>Erro de conexão com o Back-end Python</h2>
+          <h2 style={{ color: '#e11d48', marginBottom: '10px' }}>Erro ao carregar dados</h2>
           <p style={{ marginBottom: '16px' }}>{erro}</p>
           <button className="btn-primary" onClick={() => carregarDados(ano)}>
             Tentar novamente
@@ -407,7 +533,7 @@ export default function App() {
                   Análise Dinâmica por Faixa de Horário Pós-17h00
                 </h3>
                 <p className="section-subtitle">
-                  Interaja com as faixas de horário abaixo para visualizar o volume de votos e a divisão por candidato
+                  Interaja com o consolidado total ou com cada faixa de horário abaixo para visualizar o volume de votos e a explicação detalhada ao lado
                 </p>
               </div>
             </div>
@@ -775,7 +901,7 @@ export default function App() {
                   Auditor de Log de Urna do TSE — Contagem Exata de Votos Após as 17h00:00
                 </h3>
                 <p className="section-subtitle">
-                  O back-end Python analisa linha a linha o arquivo de Log da Urna Eletrônica, aplica o fuso horário unificado de Brasília e separa os votos confirmados até 17:00:00 dos votos confirmados após 17:00:00.
+                  Analisa linha a linha o arquivo de Log da Urna Eletrônica, aplica o fuso horário unificado de Brasília e separa os votos confirmados até 17:00:00 dos votos confirmados após 17:00:00.
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
