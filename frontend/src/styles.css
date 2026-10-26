@@ -209,6 +209,28 @@ body {
   transform: translateY(-1px);
 }
 
+.btn-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+  text-decoration: none;
+  padding: 8px 15px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border: 1px solid #0f172a;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+  transition: var(--transition);
+}
+
+.btn-github:hover {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+}
+
 /* Hero Scoreboard + Tug of War */
 .hero-scoreboard {
   background: var(--bg-surface);
