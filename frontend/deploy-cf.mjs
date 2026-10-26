@@ -20,14 +20,7 @@ const env = {
   CLOUDFLARE_ACCOUNT_ID: 'cd28f93cdb854c19f37035627c0f55cf',
 };
 
-console.log('1/2 Verificando/criando projeto "apuracao-eleicao" no Cloudflare Pages...');
-spawnSync(
-  process.execPath,
-  [...nodeArgs, 'pages', 'project', 'create', 'apuracao-eleicao', '--production-branch', 'main'],
-  { cwd: __dirname, stdio: 'inherit', env }
-);
-
-console.log('\n2/2 Publicando build de produção (dist/) no Cloudflare Pages...');
+console.log('Publicando build de produção (dist/) no Cloudflare Pages (apuracao-eleicao)...');
 const deploy = spawnSync(
   process.execPath,
   [
@@ -45,4 +38,3 @@ const deploy = spawnSync(
 );
 
 process.exit(deploy.status ?? 0);
-
